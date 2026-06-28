@@ -4,6 +4,8 @@ from dotenv import load_dotenv
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.tools import Tool
 
+from coderagent.agent_utils import response_to_text
+
 
 load_dotenv("coderagent/.env")
 
@@ -12,7 +14,7 @@ load_dotenv("coderagent/.env")
 def parse_fix_input(tool_input: str) -> tuple[str, str]:
     if "| ERROR:" not in tool_input:
         return tool_input.strip(), "No error provided."
-    
+
     code_part, error_part = tool_input.split("| ERROR:", 1)
     code = code_part.replace("CODE:", "", 1).strip()
     error = error_part.strip()
@@ -34,6 +36,7 @@ def clean_code_output(code: str) -> str:
 
     return cleaned.strip()
 
+
 # Uses Gemini to generate corrected Python code from broken code and an error.
 def suggest_fix(tool_input: str) -> str:
     code, error = parse_fix_input(tool_input)
@@ -45,7 +48,11 @@ def suggest_fix(tool_input: str) -> str:
     )
 
     prompt = f"""
-You are a Python debugging expert. Fix this code:
+You are a careful Python debugging expert.
+
+Fix the code in a way that is safe, readable, and explainable in an interview.
+Do not make a random value change just to avoid the error.
+Prefer guard clauses, validation, or try/except when they match the error.
 
 Code:
 {code}
@@ -58,7 +65,7 @@ Return ONLY the corrected Python code, no explanation.
 
     response = llm.invoke(prompt)
 
-    return clean_code_output(response.content)
+    return clean_code_output(response_to_text(response.content))
 
 
 SuggestFixTool = Tool(

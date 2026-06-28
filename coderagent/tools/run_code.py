@@ -10,7 +10,7 @@ def run_code(code: str) -> str:
     if result["success"]:
         return f"SUCCESS\nOutput:\n{result['output']}"
 
-    return f"FAILED\nError:\n{result['error']}"
+    return f"FAILED\nError Type: {result['error_type']}\nError:\n{result['error']}"
 
 
 RunCodeTool = Tool(
