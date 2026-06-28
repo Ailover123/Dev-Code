@@ -10,12 +10,29 @@ load_dotenv("coderagent/.env")
 
 # Splits the tool input into code and error sections for the LLM prompt.
 def parse_fix_input(tool_input: str) -> tuple[str, str]:
+    if "| ERROR:" not in tool_input:
+        return tool_input.strip(), "No error provided."
+    
     code_part, error_part = tool_input.split("| ERROR:", 1)
     code = code_part.replace("CODE:", "", 1).strip()
     error = error_part.strip()
 
     return code, error
 
+# Removes Markdown code fences so the sandbox receives plain Python code.
+def clean_code_output(code: str) -> str:
+    cleaned = code.strip()
+
+    if cleaned.startswith("```python"):
+        cleaned = cleaned.replace("```python", "", 1)
+
+    if cleaned.startswith("```"):
+        cleaned = cleaned.replace("```", "", 1)
+
+    if cleaned.endswith("```"):
+        cleaned = cleaned[:-3]
+
+    return cleaned.strip()
 
 # Uses Gemini to generate corrected Python code from broken code and an error.
 def suggest_fix(tool_input: str) -> str:
@@ -41,7 +58,7 @@ Return ONLY the corrected Python code, no explanation.
 
     response = llm.invoke(prompt)
 
-    return response.content.strip()
+    return clean_code_output(response.content)
 
 
 SuggestFixTool = Tool(
