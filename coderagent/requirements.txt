@@ -1,7 +1,7 @@
 google-generativeai
 langchain
 langchain-google-genai
-duckduckgo-search
+ddgs
 streamlit
 python-dotenv
 fastapi
