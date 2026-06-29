@@ -122,7 +122,10 @@ def read_trace_logs() -> list[dict]:
     with TRACE_LOG_PATH.open("r", encoding="utf-8") as file:
         for line in file:
             if line.strip():
-                logs.append(json.loads(line))
+                try:
+                    logs.append(json.loads(line))
+                except json.JSONDecodeError:
+                    continue
 
     return logs
 
@@ -148,6 +151,23 @@ def show_llmops_dashboard() -> None:
     metric_cols[3].metric("Gemini", gemini_runs)
     metric_cols[4].metric("Avg Steps", f"{average_steps:.1f}")
     metric_cols[5].metric("Avg Time", f"{average_time:.2f}s")
+
+    st.subheader("Recent Runs")
+
+    recent_runs = []
+
+    for log in reversed(logs[-8:]):
+        recent_runs.append({
+            "Time": log["timestamp"],
+            "Success": log["success"],
+            "Memory": log["used_memory"],
+            "Gemini": log["used_gemini"],
+            "Steps": log["steps_count"],
+            "Seconds": log["time_elapsed"],
+            "Input": log["input_code"][:80],
+        })
+
+    st.dataframe(recent_runs, use_container_width=True, hide_index=True)
 
 # Shows one ReAct step as a readable card in the trace.
 def show_step(step: dict) -> None:
@@ -198,7 +218,7 @@ def build_markdown_report(input_code: str, fixed_code: str, steps: list[dict], e
     status = "Success" if success else "Failed"
 
     lines = [
-        "# CoderAgent Debug Report",
+        "# Dev-Code Debug Report",
         "",
         f"Status: {status}",
         f"Time: {elapsed:.1f}s",
@@ -317,7 +337,6 @@ with debug_tab:
 
             for step in steps:
                 show_step(step)
-                time.sleep(0.25)
 
             if fixed_code and not fixed_code.startswith("The agent"):
                 st.subheader("Fixed Code")
@@ -326,7 +345,7 @@ with debug_tab:
             st.download_button(
                 label="Download Debug Report",
                 data=markdown_report,
-                file_name="coderagent-debug-report.md",
+                file_name="dev-code-debug-report.md",
                 mime="text/markdown",
             )
 

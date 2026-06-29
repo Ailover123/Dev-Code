@@ -11,7 +11,7 @@ mcp = FastMCP("Dev-Code")
 
 @mcp.tool()
 def run_python_code(code: str) -> str:
-    """Run Python code safely through CoderAgent's sandbox."""
+    """Run Python code safely through Dev-Code's sandbox."""
     return run_code(code)
 
 
@@ -23,13 +23,13 @@ def search_python_error(error: str) -> str:
 
 @mcp.tool()
 def search_fix_memory(error: str) -> str:
-    """Search CoderAgent memory for similar past bug fixes."""
+    """Search Dev-Code memory for similar past bug fixes."""
     return search_memory(error)
 
 
 @mcp.tool()
 def debug_python_code(code: str) -> list[dict]:
-    """Debug broken Python code using the A2A CoderAgent workflow."""
+    """Debug broken Python code using the A2A Dev-Code workflow."""
     return run_a2a_debug(code)
 
 
