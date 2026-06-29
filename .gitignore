@@ -13,3 +13,8 @@ env/
 
 *.log
 traces.jsonl
+
+# Local ChromaDB/vector-store data
+coderagent/chroma_db/
+coderagent/**/*.bin
+coderagent/**/chroma.sqlite3

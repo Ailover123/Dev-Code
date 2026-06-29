@@ -11,15 +11,20 @@ load_dotenv("coderagent/.env")
 
 
 # Splits the tool input into code and error sections for the LLM prompt.
-def parse_fix_input(tool_input: str) -> tuple[str, str]:
+def parse_fix_input(tool_input: str) -> tuple[str, str,str]:
+    memory = "No memory provided."
+
+    if "| MEMORY:" in tool_input:
+        tool_input, memory = tool_input.split("| MEMORY:", 1)
+        memory = memory.strip()
     if "| ERROR:" not in tool_input:
-        return tool_input.strip(), "No error provided."
+        return tool_input.strip(), "No error provided.", memory
 
     code_part, error_part = tool_input.split("| ERROR:", 1)
     code = code_part.replace("CODE:", "", 1).strip()
     error = error_part.strip()
 
-    return code, error
+    return code, error, memory
 
 # Removes Markdown code fences so the sandbox receives plain Python code.
 def clean_code_output(code: str) -> str:
@@ -39,7 +44,7 @@ def clean_code_output(code: str) -> str:
 
 # Uses Gemini to generate corrected Python code from broken code and an error.
 def suggest_fix(tool_input: str) -> str:
-    code, error = parse_fix_input(tool_input)
+    code, error, memory = parse_fix_input(tool_input)
 
     llm = ChatGoogleGenerativeAI(
         model="gemini-2.5-flash",
@@ -59,6 +64,9 @@ Code:
 
 Error:
 {error}
+
+Similar Past Fix Memory:
+{memory}
 
 Return ONLY the corrected Python code, no explanation.
 """

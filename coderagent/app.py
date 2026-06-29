@@ -131,6 +131,62 @@ def get_final_code(steps: list[dict]) -> str:
 # Counts visible agent steps by type for the small metric row.
 def count_steps(steps: list[dict], step_type: str) -> int:
     return sum(1 for step in steps if step["type"] == step_type)
+def get_run_status(fixed_code: str) -> str:
+    if fixed_code and not fixed_code.startswith("The agent"):
+        return "Success"
+
+    return "Failed"
+
+def get_error_type(steps: list[dict]) -> str:
+    for step in reversed(steps):
+        if step["type"] == "observation" and "Error Type:" in step["content"]:
+            for line in step["content"].splitlines():
+                if line.startswith("Error Type:"):
+                    return line.replace("Error Type:", "").strip()
+
+    return "None"
+
+def build_markdown_report(input_code: str, fixed_code: str, steps: list[dict], elapsed: float, success: bool) -> str:
+    status = "Success" if success else "Failed"
+
+    lines = [
+        "# CoderAgent Debug Report",
+        "",
+        f"Status: {status}",
+        f"Time: {elapsed:.1f}s",
+        "",
+        "## Original Code",
+        "",
+        "```python",
+        input_code,
+        "```",
+        "",
+        "## ReAct Trace",
+        "",
+    ]
+
+    for step in steps:
+        label = step["type"].title()
+        lines.append(f"### {label}")
+        lines.append("")
+        lines.append("```text")
+        lines.append(step["content"])
+        lines.append("```")
+        lines.append("")
+
+    lines.extend([
+        "## Fixed Code",
+        "",
+        "```python",
+        fixed_code,
+        "```",
+        "",
+    ])
+
+    return "\n".join(lines)
+
+if "history" not in st.session_state:
+    st.session_state["history"] = []
 
 
 st.markdown('<div class="app-kicker">CoderAgent MVP</div>', unsafe_allow_html=True)
@@ -169,12 +225,36 @@ if run_clicked:
 
         elapsed = time.perf_counter() - started_at
         fixed_code = get_final_code(steps)
+        status = get_run_status(fixed_code)
+        error_type = get_error_type(steps)
 
-        metric_cols = st.columns(4)
-        metric_cols[0].metric("Steps", len(steps))
-        metric_cols[1].metric("Actions", count_steps(steps, "action"))
-        metric_cols[2].metric("Observations", count_steps(steps, "observation"))
-        metric_cols[3].metric("Time", f"{elapsed:.1f}s")
+        success = status == "Success"
+
+        markdown_report = build_markdown_report(
+               input_code=broken_code,
+               fixed_code=fixed_code,
+               steps=steps,
+               elapsed=elapsed,
+               success=success,
+        )
+
+        st.session_state["history"].append({
+           "input_code": broken_code,
+           "fixed_code": fixed_code,
+           "steps": steps,
+           "time": elapsed,
+           "success": success,
+          })
+
+        metric_cols = st.columns(5)
+        metric_cols[0].metric("Status", status)
+        metric_cols[1].metric("Steps", len(steps))
+        metric_cols[2].metric("Tool Calls", count_steps(steps, "action"))
+        metric_cols[3].metric("Thoughts", count_steps(steps, "thought"))
+        metric_cols[4].metric("Time", f"{elapsed:.1f}s")
+        
+        if status == "Failed":
+            st.warning(f"Final error type: {error_type}")
 
         st.subheader("ReAct Trace")
 
@@ -185,3 +265,22 @@ if run_clicked:
         if fixed_code and not fixed_code.startswith("The agent"):
             st.subheader("Fixed Code")
             st.code(fixed_code, language="python")
+
+        st.download_button(
+          label="Download Debug Report",
+          data=markdown_report,
+          file_name="coderagent-debug-report.md",
+          mime="text/markdown",
+        )
+
+st.sidebar.header("Session History")
+
+if not st.session_state["history"]:
+    st.sidebar.caption("No debug sessions yet.")
+else:
+    for index, session in enumerate(reversed(st.session_state["history"]), start=1):
+        status = "Success" if session["success"] else "Failed"
+
+        with st.sidebar.expander(f"Run {index} - {status}"):
+            st.caption(f"Time: {session['time']:.1f}s")
+            st.code(session["input_code"], language="python")
