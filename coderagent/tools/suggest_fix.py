@@ -10,6 +10,21 @@ from coderagent.agent_utils import response_to_text
 load_dotenv("coderagent/.env")
 
 
+# Reads the Gemini key from local env vars or Streamlit Cloud secrets.
+def get_gemini_api_key() -> str:
+    api_key = os.getenv("GEMINI_API_KEY")
+
+    if api_key:
+        return api_key
+
+    try:
+        import streamlit as st
+
+        return st.secrets.get("GEMINI_API_KEY", "")
+    except Exception:
+        return ""
+
+
 # Splits the tool input into code and error sections for the LLM prompt.
 def parse_fix_input(tool_input: str) -> tuple[str, str,str]:
     memory = "No memory provided."
@@ -48,7 +63,7 @@ def suggest_fix(tool_input: str) -> str:
 
     llm = ChatGoogleGenerativeAI(
         model="gemini-2.5-flash",
-        google_api_key=os.getenv("GEMINI_API_KEY"),
+        google_api_key=get_gemini_api_key(),
         temperature=0,
     )
 

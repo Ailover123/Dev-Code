@@ -79,6 +79,36 @@ The app includes:
 - `LLMOps Dashboard` tab for run counts, memory usage, Gemini usage, average steps, average time, and recent runs.
 - Sidebar session history with a `Load Code` button that restores old input without rerunning the agent.
 
+## Deploy The Streamlit App
+
+Use Streamlit Cloud for the UI deployment.
+
+Deployment settings:
+
+```text
+Repository: your Dev-Code GitHub repository
+Branch: main
+Main file path: coderagent/app.py
+Requirements file: requirements.txt
+```
+
+Add this app secret in Streamlit Cloud:
+
+```text
+GEMINI_API_KEY=your_real_key_here
+```
+
+The root `requirements.txt` is intentionally focused on the Streamlit app. The broader backend dependencies remain in `coderagent/requirements.txt` for local FastAPI and MCP work.
+
+Important deployment note:
+
+```text
+coderagent/chroma_db/
+coderagent/traces.jsonl
+```
+
+are local runtime artifacts. On Streamlit Cloud, they may reset when the app restarts. That is fine for a portfolio demo, but a production version should use persistent storage.
+
 ## Run The FastAPI Server
 
 ```powershell
