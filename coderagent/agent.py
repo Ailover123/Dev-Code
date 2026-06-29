@@ -1,12 +1,14 @@
 from coderagent.tools.run_code import RunCodeTool
 from coderagent.tools.search_error import SearchErrorTool
 from coderagent.tools.suggest_fix import SuggestFixTool
-
+from coderagent.tools.search_memory import SearchMemoryTool
+from coderagent.fix_memory import save_fix
 
 TOOLS = {
     "run_code": RunCodeTool,
     "search_error": SearchErrorTool,
     "suggest_fix": SuggestFixTool,
+    "search_memory": SearchMemoryTool,
 }
 
 
@@ -19,6 +21,17 @@ def run_tool(action: str, action_input: str) -> str:
 
     return tool.invoke(action_input)
 
+# Pulls the first fixed code block out of a memory search result.
+def extract_fixed_code_from_memory(memory_result: str) -> str:
+    if "Fixed Code:" not in memory_result:
+        return ""
+
+    fixed_part = memory_result.split("Fixed Code:", 1)[1]
+
+    if "\n\nError:" in fixed_part:
+        fixed_part = fixed_part.split("\n\nError:", 1)[0]
+
+    return fixed_part.strip()
 
 # Runs the debugging workflow and returns each visible ReAct-style step.
 def run_agent(broken_code: str) -> list[dict]:
@@ -47,7 +60,51 @@ def run_agent(broken_code: str) -> list[dict]:
             "content": broken_code,
         })
         return steps
+    
+    steps.append({
+         "type": "thought",
+           "content": "The code failed, so I should check memory for a similar past fix first.",
+    })
+    
+    steps.append({
+        "type": "action",
+        "content": "search_memory: searching memory for the latest error",
+        })
+    
+    memory_result = run_tool("search_memory", first_result)
+    
+    steps.append({
+        "type": "observation",
+        "content": memory_result,
+        })
+    
+    memory_fixed_code = extract_fixed_code_from_memory(memory_result)
 
+    if memory_fixed_code:
+        steps.append({
+            "type": "thought",
+            "content": "Memory contains a past fix, so I should verify it before asking Gemini.",
+        })
+
+        steps.append({
+            "type": "action",
+            "content": f"run_code: {memory_fixed_code}",
+        })
+
+        memory_verify_result = run_tool("run_code", memory_fixed_code)
+
+        steps.append({
+            "type": "observation",
+            "content": memory_verify_result,
+        })
+
+        if memory_verify_result.startswith("SUCCESS"):
+            steps.append({
+                "type": "final",
+                "content": memory_fixed_code,
+            })
+            return steps
+    
     steps.append({
         "type": "thought",
         "content": "The code failed, so I should search the error before suggesting a fix.",
@@ -55,7 +112,7 @@ def run_agent(broken_code: str) -> list[dict]:
 
     steps.append({
         "type": "action",
-        "content": f"search_error: {first_result}",
+        "content": "search_error: searching web context for the latest error",
     })
 
     search_result = run_tool("search_error", first_result)
@@ -65,7 +122,7 @@ def run_agent(broken_code: str) -> list[dict]:
         "content": search_result,
     })
 
-    fix_input = f"CODE: {broken_code} | ERROR: {first_result}"
+    fix_input = f"CODE: {broken_code} | ERROR: {first_result} | MEMORY: {memory_result}"
 
     steps.append({
         "type": "thought",
@@ -102,6 +159,13 @@ def run_agent(broken_code: str) -> list[dict]:
     })
 
     if final_result.startswith("SUCCESS"):
+        save_fix(first_result, broken_code, fixed_code)
+
+        steps.append({
+            "type": "thought",
+            "content": "The fix worked, so I saved it to memory for future debugging runs.",
+            })
+        
         steps.append({
             "type": "final",
             "content": fixed_code,
