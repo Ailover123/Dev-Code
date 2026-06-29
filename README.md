@@ -159,6 +159,3 @@ This folder is intentionally ignored by Git.
 4. Dev-Code should use memory and skip Gemini if the remembered fix verifies.
 5. Open the dashboard and confirm run count, memory usage, Gemini usage, and timing.
 
-## Interview Summary
-
-Dev-Code started as a manual ReAct debugging loop and grew into a small agentic system. It now has specialist agents, local code execution, web search, Gemini-based fixing, ChromaDB memory, MCP exposure, FastAPI access, and JSONL trace logging for observability.
