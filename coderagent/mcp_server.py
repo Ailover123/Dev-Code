@@ -28,9 +28,9 @@ def search_fix_memory(error: str) -> str:
 
 
 @mcp.tool()
-def debug_code(code: str, language: str = "auto") -> list[dict]:
+def debug_code(code: str, language: str = "auto", user_goal: str = "") -> list[dict]:
     """Debug broken Python or JavaScript code using the A2A Dev-Code workflow."""
-    return run_a2a_debug(code, language)
+    return run_a2a_debug(code, language, user_goal)
 
 
 if __name__ == "__main__":

@@ -70,12 +70,13 @@ def summarize_runs(runs: list[dict]) -> dict:
 
 
 # Writes one completed debugging run to a JSONL log file.
-def log_debug_run(input_code: str, steps: list[dict], elapsed: float, language: str = "auto") -> None:
+def log_debug_run(input_code: str, steps: list[dict], elapsed: float, language: str = "auto", user_goal: str = "") -> None:
     final_code = get_final_code(steps)
 
     record = {
         "timestamp": datetime.now().isoformat(timespec="seconds"),
         "language": language,
+        "user_goal": user_goal,
         "input_code": input_code,
         "fixed_code": final_code,
         "success": bool(final_code and not final_code.startswith("The generated fix failed")),

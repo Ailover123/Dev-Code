@@ -11,6 +11,7 @@ app = FastAPI(title="Dev-Code API")
 class DebugRequest(BaseModel):
     code: str
     language: str = "auto"
+    user_goal: str = ""
 
 
 # Returns the final answer from the trace.
@@ -41,17 +42,18 @@ def health_check() -> dict:
 def debug_code(request: DebugRequest) -> dict:
     started_at = time.perf_counter()
 
-    steps = run_a2a_debug(request.code, request.language)
+    steps = run_a2a_debug(request.code, request.language, request.user_goal)
 
     elapsed = time.perf_counter() - started_at
     fixed_code = get_final_code(steps)
 
-    log_debug_run(request.code, steps, elapsed, request.language)
+    log_debug_run(request.code, steps, elapsed, request.language, request.user_goal)
 
     return {
         "success": is_successful_trace(steps),
         "fixed_code": fixed_code,
         "language": request.language,
+        "user_goal": request.user_goal,
         "trace": steps,
     }
 

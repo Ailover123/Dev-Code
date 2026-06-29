@@ -22,8 +22,16 @@ def add_step(steps: list[dict], step_type: str, agent: str, content: str) -> Non
 
 
 # Runs the A2A debugging workflow by coordinating specialist agents.
-def run_a2a_debug(broken_code: str, language: str = "auto") -> list[dict]:
+def run_a2a_debug(broken_code: str, language: str = "auto", user_goal: str = "") -> list[dict]:
     steps = []
+
+    if user_goal.strip():
+        add_step(
+            steps,
+            "thought",
+            "OrchestratorAgent",
+            f"User requested: {user_goal.strip()}",
+        )
 
     add_step(
         steps,
@@ -160,7 +168,7 @@ def run_a2a_debug(broken_code: str, language: str = "auto") -> list[dict]:
         "I should generate a corrected version using the error and memory context.",
     )
 
-    fixed_code = generate_fix(broken_code, first_result, memory_result, language)
+    fixed_code = generate_fix(broken_code, first_result, memory_result, language, user_goal)
 
     add_step(
         steps,
