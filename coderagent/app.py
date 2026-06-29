@@ -8,7 +8,7 @@ import streamlit as st
 ROOT_DIR = Path(__file__).resolve().parent.parent
 sys.path.append(str(ROOT_DIR))
 
-from coderagent.agent import run_agent
+from coderagent.agents.orchestrator import run_a2a_debug
 
 
 st.set_page_config(page_title="Dev-Code", layout="wide")
@@ -106,7 +106,8 @@ st.markdown(
 def show_step(step: dict) -> None:
     step_type = step["type"]
     content = html.escape(step["content"])
-    label = step_type.upper()
+    agent = step.get("agent", "Dev-Code Agent")
+    label = f"{agent} - {step_type.upper()}"
 
     st.markdown(
         f"""
@@ -189,16 +190,14 @@ if "history" not in st.session_state:
     st.session_state["history"] = []
 
 
-st.markdown('<div class="app-kicker">CoderAgent MVP</div>', unsafe_allow_html=True)
 st.markdown(
-    '<div class="app-title">Dev-Code - ReAct Debugging Agent</div>',
+    '<div class="app-title">Dev-Code - A2A ReAct Debugging Agent</div>',
     unsafe_allow_html=True,
 )
 st.markdown(
     """
     <div class="app-subtitle">
-        Paste broken Python code and watch the agent run it, inspect the error,
-        search context, suggest a fix, and verify the result.
+       Paste broken Python code and watch specialist agents analyze, fix, verify, and remember debugging patterns.
     </div>
     """,
     unsafe_allow_html=True,
@@ -221,7 +220,7 @@ if run_clicked:
         started_at = time.perf_counter()
 
         with st.spinner("Agent is debugging..."):
-            steps = run_agent(broken_code)
+            steps = run_a2a_debug(broken_code)
 
         elapsed = time.perf_counter() - started_at
         fixed_code = get_final_code(steps)
