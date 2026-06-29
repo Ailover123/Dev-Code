@@ -5,6 +5,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.tools import Tool
 
 from coderagent.agent_utils import response_to_text
+from coderagent.sandbox import detect_language
 
 
 load_dotenv("coderagent/.env")
@@ -25,21 +26,27 @@ def get_gemini_api_key() -> str:
         return ""
 
 
-# Splits the tool input into code and error sections for the LLM prompt.
-def parse_fix_input(tool_input: str) -> tuple[str, str,str]:
+# Splits the tool input into language, code, error, and memory sections.
+def parse_fix_input(tool_input: str) -> tuple[str, str, str, str]:
+    language = "auto"
     memory = "No memory provided."
+
+    if tool_input.startswith("LANGUAGE:") and "| CODE:" in tool_input:
+        language_part, tool_input = tool_input.split("| CODE:", 1)
+        language = language_part.replace("LANGUAGE:", "", 1).strip()
+        tool_input = f"CODE: {tool_input.strip()}"
 
     if "| MEMORY:" in tool_input:
         tool_input, memory = tool_input.split("| MEMORY:", 1)
         memory = memory.strip()
     if "| ERROR:" not in tool_input:
-        return tool_input.strip(), "No error provided.", memory
+        return language, tool_input.strip(), "No error provided.", memory
 
     code_part, error_part = tool_input.split("| ERROR:", 1)
     code = code_part.replace("CODE:", "", 1).strip()
     error = error_part.strip()
 
-    return code, error, memory
+    return language, code, error, memory
 
 # Removes Markdown code fences so the sandbox receives plain Python code.
 def clean_code_output(code: str) -> str:
@@ -57,9 +64,10 @@ def clean_code_output(code: str) -> str:
     return cleaned.strip()
 
 
-# Uses Gemini to generate corrected Python code from broken code and an error.
+# Uses Gemini to generate corrected code from broken code and an error.
 def suggest_fix(tool_input: str) -> str:
-    code, error, memory = parse_fix_input(tool_input)
+    language, code, error, memory = parse_fix_input(tool_input)
+    language = detect_language(code, language)
 
     llm = ChatGoogleGenerativeAI(
         model="gemini-2.5-flash",
@@ -68,7 +76,7 @@ def suggest_fix(tool_input: str) -> str:
     )
 
     prompt = f"""
-You are a careful Python debugging expert.
+You are a careful {language} debugging expert.
 
 Fix the code in a way that is safe, readable, and explainable in an interview.
 Do not make a random value change just to avoid the error.
@@ -83,7 +91,7 @@ Error:
 Similar Past Fix Memory:
 {memory}
 
-Return ONLY the corrected Python code, no explanation.
+Return ONLY the corrected {language} code, no explanation.
 """
 
     response = llm.invoke(prompt)

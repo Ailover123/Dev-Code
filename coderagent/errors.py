@@ -1,19 +1,19 @@
 import re
 
 
-class CoderAgentError(Exception):
-    """Base exception for expected CoderAgent failures."""
+class DevCodeError(Exception):
+    """Base exception for expected Dev-Code failures."""
 
 
-class UnsafeCodeError(CoderAgentError):
+class UnsafeCodeError(DevCodeError):
     """Raised when submitted code matches a blocked safety pattern."""
 
 
-class CodeTimeoutError(CoderAgentError):
+class CodeTimeoutError(DevCodeError):
     """Raised when submitted code runs longer than the sandbox limit."""
 
 
-class ToolExecutionError(CoderAgentError):
+class ToolExecutionError(DevCodeError):
     """Raised when an agent tool fails unexpectedly."""
 
 

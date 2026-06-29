@@ -2,7 +2,6 @@ import html
 import sys
 import time
 from pathlib import Path
-import json
 
 import streamlit as st
 
@@ -11,8 +10,7 @@ sys.path.append(str(ROOT_DIR))
 
 from coderagent.agents.orchestrator import run_a2a_debug
 from coderagent.logger import log_debug_run
-
-TRACE_LOG_PATH = ROOT_DIR / "coderagent" / "traces.jsonl"
+from coderagent.logger import read_debug_runs, summarize_runs
 
 st.set_page_config(page_title="Dev-Code", layout="wide")
 
@@ -114,20 +112,7 @@ st.markdown(
 
 # Reads saved trace logs from the JSONL log file.
 def read_trace_logs() -> list[dict]:
-    if not TRACE_LOG_PATH.exists():
-        return []
-
-    logs = []
-
-    with TRACE_LOG_PATH.open("r", encoding="utf-8") as file:
-        for line in file:
-            if line.strip():
-                try:
-                    logs.append(json.loads(line))
-                except json.JSONDecodeError:
-                    continue
-
-    return logs
+    return read_debug_runs()
 
 # Shows simple LLMOps metrics from previous debug runs.
 def show_llmops_dashboard() -> None:
@@ -137,20 +122,15 @@ def show_llmops_dashboard() -> None:
         st.info("No trace logs yet. Run the FastAPI /debug endpoint first.")
         return
 
-    total_runs = len(logs)
-    successful_runs = sum(1 for log in logs if log["success"])
-    memory_runs = sum(1 for log in logs if log["used_memory"])
-    gemini_runs = sum(1 for log in logs if log["used_gemini"])
-    average_steps = sum(log["steps_count"] for log in logs) / total_runs
-    average_time = sum(log["time_elapsed"] for log in logs) / total_runs
+    metrics = summarize_runs(logs)
 
     metric_cols = st.columns(6)
-    metric_cols[0].metric("Runs", total_runs)
-    metric_cols[1].metric("Success", f"{successful_runs}/{total_runs}")
-    metric_cols[2].metric("Memory", memory_runs)
-    metric_cols[3].metric("Gemini", gemini_runs)
-    metric_cols[4].metric("Avg Steps", f"{average_steps:.1f}")
-    metric_cols[5].metric("Avg Time", f"{average_time:.2f}s")
+    metric_cols[0].metric("Runs", metrics["runs"])
+    metric_cols[1].metric("Success", f"{metrics['successful_runs']}/{metrics['runs']}")
+    metric_cols[2].metric("Memory", metrics["memory_runs"])
+    metric_cols[3].metric("Gemini", metrics["gemini_runs"])
+    metric_cols[4].metric("Avg Steps", f"{metrics['average_steps']:.1f}")
+    metric_cols[5].metric("Avg Time", f"{metrics['average_time']:.2f}s")
 
     st.subheader("Recent Runs")
 
@@ -158,13 +138,14 @@ def show_llmops_dashboard() -> None:
 
     for log in reversed(logs[-8:]):
         recent_runs.append({
-            "Time": log["timestamp"],
-            "Success": log["success"],
-            "Memory": log["used_memory"],
-            "Gemini": log["used_gemini"],
-            "Steps": log["steps_count"],
-            "Seconds": log["time_elapsed"],
-            "Input": log["input_code"][:80],
+            "Time": log.get("timestamp", ""),
+            "Success": log.get("success", False),
+            "Memory": log.get("used_memory", False),
+            "Gemini": log.get("used_gemini", False),
+            "Steps": log.get("steps_count", 0),
+            "Seconds": log.get("time_elapsed", 0),
+            "Language": log.get("language", "auto"),
+            "Input": log.get("input_code", "")[:80],
         })
 
     st.dataframe(recent_runs, use_container_width=True, hide_index=True)
@@ -259,6 +240,9 @@ if "history" not in st.session_state:
 if "debug_code" not in st.session_state:
     st.session_state["debug_code"] = "print(10 / 0)"
 
+if "debug_language" not in st.session_state:
+    st.session_state["debug_language"] = "auto"
+
 
 # Loads a previous session's code into the debugger editor.
 def load_history_code(code: str) -> None:
@@ -272,7 +256,7 @@ st.markdown(
 st.markdown(
     """
     <div class="app-subtitle">
-       Paste broken Python code and watch specialist agents analyze, fix, verify, and remember debugging patterns.
+       Paste broken code and watch specialist agents analyze, fix, verify, and remember debugging patterns.
     </div>
     """,
     unsafe_allow_html=True,
@@ -281,8 +265,22 @@ st.markdown(
 debug_tab, dashboard_tab = st.tabs(["Debugger", "LLMOps Dashboard"])
 
 with debug_tab:
+    language_options = {
+        "Auto": "auto",
+        "Python": "python",
+        "JavaScript": "javascript",
+    }
+
+    selected_language = st.selectbox(
+        "Language",
+        options=list(language_options.keys()),
+        key="debug_language_label",
+    )
+    debug_language = language_options[selected_language]
+    st.session_state["debug_language"] = debug_language
+
     broken_code = st.text_area(
-        "Broken Python code",
+        "Broken code",
         key="debug_code",
         height=220,
     )
@@ -291,12 +289,12 @@ with debug_tab:
 
     if run_clicked:
         if not broken_code.strip():
-            st.error("Please paste some Python code first.")
+            st.error("Please paste some code first.")
         else:
             started_at = time.perf_counter()
 
             with st.spinner("Agent is debugging..."):
-                steps = run_a2a_debug(broken_code)
+                steps = run_a2a_debug(broken_code, debug_language)
 
             elapsed = time.perf_counter() - started_at
             fixed_code = get_final_code(steps)
@@ -315,13 +313,14 @@ with debug_tab:
 
             st.session_state["history"].append({
                 "input_code": broken_code,
+                "language": debug_language,
                 "fixed_code": fixed_code,
                 "steps": steps,
                 "time": elapsed,
                 "success": success,
             })
 
-            log_debug_run(broken_code, steps, elapsed)
+            log_debug_run(broken_code, steps, elapsed, debug_language)
 
             metric_cols = st.columns(5)
             metric_cols[0].metric("Status", status)
@@ -340,7 +339,7 @@ with debug_tab:
 
             if fixed_code and not fixed_code.startswith("The agent"):
                 st.subheader("Fixed Code")
-                st.code(fixed_code, language="python")
+                st.code(fixed_code, language="javascript" if debug_language == "javascript" else "python")
 
             st.download_button(
                 label="Download Debug Report",
@@ -362,7 +361,11 @@ else:
 
         with st.sidebar.expander(f"Run {index} - {status}"):
             st.caption(f"Time: {session['time']:.1f}s")
-            st.code(session["input_code"], language="python")
+            st.caption(f"Language: {session.get('language', 'auto')}")
+            st.code(
+                session["input_code"],
+                language="javascript" if session.get("language") == "javascript" else "python",
+            )
             st.button(
                 "Load Code",
                 key=f"load_history_{index}",

@@ -11,7 +11,7 @@ mcp = FastMCP("Dev-Code")
 
 @mcp.tool()
 def run_python_code(code: str) -> str:
-    """Run Python code safely through Dev-Code's sandbox."""
+    """Run Python or JavaScript code safely through Dev-Code's sandbox."""
     return run_code(code)
 
 
@@ -28,9 +28,9 @@ def search_fix_memory(error: str) -> str:
 
 
 @mcp.tool()
-def debug_python_code(code: str) -> list[dict]:
-    """Debug broken Python code using the A2A Dev-Code workflow."""
-    return run_a2a_debug(code)
+def debug_code(code: str, language: str = "auto") -> list[dict]:
+    """Debug broken Python or JavaScript code using the A2A Dev-Code workflow."""
+    return run_a2a_debug(code, language)
 
 
 if __name__ == "__main__":

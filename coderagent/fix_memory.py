@@ -1,7 +1,9 @@
 import chromadb
 
+from coderagent.settings import get_chroma_dir
 
-client = chromadb.PersistentClient(path="coderagent/chroma_db")
+
+client = chromadb.PersistentClient(path=str(get_chroma_dir()))
 
 collection = client.get_or_create_collection(name="past_fixes")
 

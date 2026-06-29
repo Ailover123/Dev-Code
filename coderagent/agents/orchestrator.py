@@ -1,7 +1,7 @@
 from coderagent.agents.analyzer import analyze_error
 from coderagent.agents.fixer import generate_fix
 from coderagent.agents.verifier import verify_code
-from coderagent.agent import extract_fixed_code_from_memory, run_tool
+from coderagent.agent_runtime import extract_fixed_code_from_memory, run_tool
 from coderagent.fix_memory import save_fix
 
 # Extracts the error type name from a run_code result or memory result.
@@ -22,7 +22,7 @@ def add_step(steps: list[dict], step_type: str, agent: str, content: str) -> Non
 
 
 # Runs the A2A debugging workflow by coordinating specialist agents.
-def run_a2a_debug(broken_code: str) -> list[dict]:
+def run_a2a_debug(broken_code: str, language: str = "auto") -> list[dict]:
     steps = []
 
     add_step(
@@ -39,7 +39,7 @@ def run_a2a_debug(broken_code: str) -> list[dict]:
         f"run_code: {broken_code}",
     )
 
-    first_success, first_result = verify_code(broken_code)
+    first_success, first_result = verify_code(broken_code, language)
 
     add_step(
         steps,
@@ -104,7 +104,7 @@ def run_a2a_debug(broken_code: str) -> list[dict]:
             f"run_code: {memory_fixed_code}",
         )
 
-        memory_success, memory_verify_result = verify_code(memory_fixed_code)
+        memory_success, memory_verify_result = verify_code(memory_fixed_code, language)
 
         add_step(
             steps,
@@ -160,7 +160,7 @@ def run_a2a_debug(broken_code: str) -> list[dict]:
         "I should generate a corrected version using the error and memory context.",
     )
 
-    fixed_code = generate_fix(broken_code, first_result, memory_result)
+    fixed_code = generate_fix(broken_code, first_result, memory_result, language)
 
     add_step(
         steps,
@@ -183,7 +183,7 @@ def run_a2a_debug(broken_code: str) -> list[dict]:
         f"run_code: {fixed_code}",
     )
 
-    final_success, final_result = verify_code(fixed_code)
+    final_success, final_result = verify_code(fixed_code, language)
 
     add_step(
         steps,

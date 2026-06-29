@@ -21,7 +21,12 @@ def get_runner_args(language: str, code: str) -> list[str]:
     return ["python", "-c", code]
 
 
-def detect_language(code: str) -> str:
+def detect_language(code: str, preferred_language: str = "auto") -> str:
+    preferred_language = preferred_language.lower().strip()
+
+    if preferred_language in {"python", "javascript"}:
+        return preferred_language
+
     lowered_code = code.lower()
 
     python_signals = ["def ", "import ", "print(", "elif ", "except "]
@@ -37,8 +42,8 @@ def detect_language(code: str) -> str:
 
     return "python"
 
-# Runs user Python code safely after blocking obviously dangerous patterns.
-def safe_exec(code: str) -> dict:
+# Runs user code safely after blocking obviously dangerous patterns.
+def safe_exec(code: str, language: str = "auto") -> dict:
     for pattern in DANGEROUS_PATTERNS:
         if pattern in code:
             return {
@@ -46,8 +51,9 @@ def safe_exec(code: str) -> dict:
                 "output": "",
                 "error": "Blocked: unsafe code detected",
                 "error_type": UnsafeCodeError.__name__,
+                "language": detect_language(code, language),
             }
-    language = detect_language(code) 
+    language = detect_language(code, language)
 
     try:
         result = subprocess.run(
@@ -62,6 +68,7 @@ def safe_exec(code: str) -> dict:
             "output": error.stdout or "",
             "error": "Execution timed out after 5 seconds",
             "error_type": CodeTimeoutError.__name__,
+            "language": language,
         }
     except Exception as error:
         message = format_exception(error)
@@ -70,6 +77,7 @@ def safe_exec(code: str) -> dict:
             "output": "",
             "error": message,
             "error_type": extract_error_type(message),
+            "language": language,
         }
 
     return {

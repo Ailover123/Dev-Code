@@ -1,10 +1,10 @@
 # Dev-Code
 
-Dev-Code is an A2A ReAct debugging agent for Python code. It runs broken code in a local sandbox, analyzes the error, searches memory and web context, generates a fix with Gemini when needed, verifies the fix, and logs the full trace for review.
+Dev-Code is an A2A ReAct debugging agent for Python and JavaScript code. It runs broken code in a local sandbox, analyzes the error, searches memory and web context, generates a fix with Gemini when needed, verifies the fix, and logs the full trace for review.
 
 ## What It Does
 
-- Runs Python code through a guarded subprocess sandbox.
+- Runs Python and JavaScript code through a guarded subprocess sandbox.
 - Shows a visible ReAct-style trace with specialist agents.
 - Uses an A2A flow: `OrchestratorAgent`, `AnalyzerAgent`, `FixerAgent`, and `VerifierAgent`.
 - Stores verified fixes in ChromaDB memory.
@@ -65,7 +65,10 @@ Then edit `coderagent\.env`:
 
 ```text
 GEMINI_API_KEY=your_real_key_here
+DEV_CODE_DATA_DIR=coderagent
 ```
+
+`DEV_CODE_DATA_DIR` controls where Dev-Code writes ChromaDB memory and JSONL trace logs. Keep the default for local demos, or point it at a persistent volume for hosted backends.
 
 ## Run The Streamlit App
 
@@ -125,7 +128,8 @@ Example request body for `POST /debug`:
 
 ```json
 {
-  "code": "print(10 / 0)"
+  "code": "print(10 / 0)",
+  "language": "python"
 }
 ```
 
@@ -152,7 +156,7 @@ Exposed tools:
 - `run_python_code`
 - `search_python_error`
 - `search_fix_memory`
-- `debug_python_code`
+- `debug_code`
 
 ## Logs And Memory
 
