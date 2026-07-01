@@ -5,6 +5,7 @@ Dev-Code is an A2A ReAct debugging agent for Python and JavaScript code. It runs
 ## What It Does
 
 - Runs Python and JavaScript code through a guarded subprocess sandbox.
+- Detects supported languages through a small registry and can learn new one-liner runners from web search.
 - Shows a visible ReAct-style trace with specialist agents.
 - Uses an A2A flow: `OrchestratorAgent`, `AnalyzerAgent`, `FixerAgent`, and `VerifierAgent`.
 - Stores verified fixes in ChromaDB memory.
@@ -65,6 +66,7 @@ Then edit `coderagent\.env`:
 
 ```text
 GEMINI_API_KEY=your_real_key_here
+GEMINI_MODEL=gemini-2.5-flash
 DEV_CODE_DATA_DIR=coderagent
 ```
 
@@ -80,6 +82,7 @@ The app includes:
 
 - `Debugger` tab for interactive debugging.
 - `LLMOps Dashboard` tab for run counts, memory usage, Gemini usage, average steps, average time, and recent runs.
+- `Supported languages` sidebar expander that lists known runners and whether they were verified locally.
 - Sidebar session history with a `Load Code` button that restores old input without rerunning the agent.
 
 ## Deploy The Streamlit App
@@ -99,6 +102,7 @@ Add this app secret in Streamlit Cloud:
 
 ```text
 GEMINI_API_KEY=your_real_key_here
+GEMINI_MODEL=gemini-2.5-flash
 ```
 
 The root `requirements.txt` is intentionally focused on the Streamlit app. The broader backend dependencies remain in `coderagent/requirements.txt` for local FastAPI and MCP work.

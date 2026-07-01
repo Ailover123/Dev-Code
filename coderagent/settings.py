@@ -15,3 +15,8 @@ def get_chroma_dir() -> Path:
 # Returns the JSONL trace log path.
 def get_trace_log_path() -> Path:
     return get_data_dir() / "traces.jsonl"
+
+
+# Returns the persisted language registry path.
+def get_language_registry_path() -> Path:
+    return get_data_dir() / "language_registry.json"

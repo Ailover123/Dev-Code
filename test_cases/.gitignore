@@ -1,0 +1,3 @@
+# Keep manual/local test cases out of commits by default.
+*
+!.gitignore

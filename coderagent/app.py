@@ -9,6 +9,7 @@ ROOT_DIR = Path(__file__).resolve().parent.parent
 sys.path.append(str(ROOT_DIR))
 
 from coderagent.agents.orchestrator import run_a2a_debug
+from coderagent.lang_registry import list_supported_languages
 from coderagent.logger import log_debug_run
 from coderagent.logger import read_debug_runs, summarize_runs
 
@@ -180,11 +181,21 @@ def get_final_code(steps: list[dict]) -> str:
 # Counts visible agent steps by type for the small metric row.
 def count_steps(steps: list[dict], step_type: str) -> int:
     return sum(1 for step in steps if step["type"] == step_type)
+
+
 def get_run_status(fixed_code: str) -> str:
-    if fixed_code and not fixed_code.startswith("The agent"):
+    failure_prefixes = (
+        "The generated fix failed",
+        "The agent",
+        "Language detected but runner",
+    )
+
+    if fixed_code and not fixed_code.startswith(failure_prefixes):
         return "Success"
 
     return "Failed"
+
+
 
 def get_error_type(steps: list[dict]) -> str:
     for step in reversed(steps):
@@ -195,7 +206,23 @@ def get_error_type(steps: list[dict]) -> str:
 
     return "None"
 
-def build_markdown_report(input_code: str, fixed_code: str, steps: list[dict], elapsed: float, success: bool) -> str:
+
+def get_user_goal(steps: list[dict]) -> str:
+    for step in steps:
+        if step["type"] == "thought" and step.get("agent") == "OrchestratorAgent" and step["content"].startswith("User requested:"):
+            return step["content"].replace("User requested:", "", 1).strip()
+
+    return ""
+
+
+def build_markdown_report(
+    input_code: str,
+    fixed_code: str,
+    steps: list[dict],
+    elapsed: float,
+    success: bool,
+    user_goal: str = "",
+) -> str:
     status = "Success" if success else "Failed"
 
     lines = [
@@ -204,6 +231,17 @@ def build_markdown_report(input_code: str, fixed_code: str, steps: list[dict], e
         f"Status: {status}",
         f"Time: {elapsed:.1f}s",
         "",
+    ]
+
+    if user_goal.strip():
+        lines.extend([
+            "## User Goal",
+            "",
+            user_goal.strip(),
+            "",
+        ])
+
+    lines.extend([
         "## Original Code",
         "",
         "```python",
@@ -212,7 +250,7 @@ def build_markdown_report(input_code: str, fixed_code: str, steps: list[dict], e
         "",
         "## ReAct Trace",
         "",
-    ]
+    ])
 
     for step in steps:
         label = step["type"].title()
@@ -256,7 +294,7 @@ st.markdown(
 st.markdown(
     """
     <div class="app-subtitle">
-       Paste broken code and watch specialist agents analyze, fix, verify, and remember debugging patterns.
+       Paste broken Python code and watch specialist agents analyze, fix, verify, and remember debugging patterns.
     </div>
     """,
     unsafe_allow_html=True,
@@ -269,6 +307,11 @@ with debug_tab:
         "Auto": "auto",
         "Python": "python",
         "JavaScript": "javascript",
+        "PHP": "php",
+        "Ruby": "ruby",
+        "Perl": "perl",
+        "Lua": "lua",
+        "TypeScript": "typescript",
     }
 
     selected_language = st.selectbox(
@@ -285,6 +328,13 @@ with debug_tab:
         height=220,
     )
 
+    user_goal = st.text_area(
+        "What do you want? (optional)",
+        key="user_goal",
+        height=90,
+        placeholder="Example: keep the same behavior but make the code easier to read",
+    )
+
     run_clicked = st.button("Debug with Agent", type="primary")
 
     if run_clicked:
@@ -294,12 +344,13 @@ with debug_tab:
             started_at = time.perf_counter()
 
             with st.spinner("Agent is debugging..."):
-                steps = run_a2a_debug(broken_code, debug_language)
+                steps = run_a2a_debug(broken_code, debug_language, user_goal)
 
             elapsed = time.perf_counter() - started_at
             fixed_code = get_final_code(steps)
             status = get_run_status(fixed_code)
             error_type = get_error_type(steps)
+            trace_goal = get_user_goal(steps)
 
             success = status == "Success"
 
@@ -309,6 +360,7 @@ with debug_tab:
                 steps=steps,
                 elapsed=elapsed,
                 success=success,
+                user_goal=trace_goal,
             )
 
             st.session_state["history"].append({
@@ -318,9 +370,10 @@ with debug_tab:
                 "steps": steps,
                 "time": elapsed,
                 "success": success,
+                "user_goal": user_goal,
             })
 
-            log_debug_run(broken_code, steps, elapsed, debug_language)
+            log_debug_run(broken_code, steps, elapsed, debug_language, user_goal)
 
             metric_cols = st.columns(5)
             metric_cols[0].metric("Status", status)
@@ -351,6 +404,16 @@ with debug_tab:
 with dashboard_tab:
     show_llmops_dashboard()
 
+with st.sidebar.expander("Supported languages", expanded=False):
+    supported_languages = list_supported_languages()
+
+    if not supported_languages:
+        st.caption("No languages registered yet.")
+    else:
+        for language_info in supported_languages:
+            status_label = "verified" if language_info["verified"] else "learned"
+            st.caption(f"{language_info['name']} — {language_info['runner']} ({status_label})")
+
 st.sidebar.header("Session History")
 
 if not st.session_state["history"]:
@@ -362,6 +425,8 @@ else:
         with st.sidebar.expander(f"Run {index} - {status}"):
             st.caption(f"Time: {session['time']:.1f}s")
             st.caption(f"Language: {session.get('language', 'auto')}")
+            if session.get("user_goal"):
+                st.caption(f"Goal: {session['user_goal']}")
             st.code(
                 session["input_code"],
                 language="javascript" if session.get("language") == "javascript" else "python",
